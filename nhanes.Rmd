@@ -1,0 +1,98 @@
+---
+title: "ECP8500"
+author: "Kyle Baron"
+output: 
+  templ::mrg_beamer: 
+    toc: false
+---
+
+
+```{r,setup, include=FALSE}
+knitr::opts_chunk$set(cache=FALSE)
+```
+
+# ECP8500 / NHANES
+
+## Sources of variability 
+
+- data simulated from a _model_
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.height = 4}
+library(mrgsolve)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+theme_set(theme_bw())
+
+mod <- modlib("popex") %>% param(TVV = 20, TVCL = 0.5, TVKA = 0.7)
+mod <- omat(mod, dmat(0.03, 0.4, 0.4))
+data <- expand.ev(amt = 1000, WT = rlnorm(3000, log(80), sqrt(0.1)), ii = 24, ss = 1)
+out <- mrgsim(mod, data, output = "df", end = 72, delta = 0.1, add = 0.25)
+out <- filter(out, DV > 0.05)
+sims <- group_by(out,time) 
+sims <- summarise(sims, med = median(DV), lo = quantile(DV, 0.025), 
+                 hi = quantile(DV, 0.975))
+#sims <- slice(sims, -c(1))
+p1 <- ggplot(sims, aes(x = time)) + 
+  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.5, 
+              fill = "cornflowerblue") + 
+  geom_line(aes(y = med), lwd = 1.5) + ylim(0, NA) + 
+  scale_x_continuous(breaks = seq(0,96,6)) + 
+  ylab("Concentration (ng/mL)") + xlab("Time (hour)") 
+p1
+```
+
+
+## Narrow in on 24 hours post dose
+
+```{r, echo = FALSE, fig.height = 4}
+sims <- filter(out, time %in% c(0, 3, 8, 12, 24, 36, 48, 72))
+summ <- group_by(sims, time) %>% summarise(med = median(DV))
+p2 <- ggplot(data = sims, aes(x = time, y = DV)) + 
+  geom_point(position = position_jitter(0.5)) + 
+  #scale_y_log10() + 
+  geom_point(data = summ, aes(time, y = med), size = 4, color = "firebrick") + 
+  geom_line(data = summ, aes(time, y = med), lwd = 1.5, color = "firebrick") + 
+  scale_x_continuous(breaks = c(0, 3, 8, 12, 24, 36, 48, 72)) + 
+  ylab("Concentration (ng/mL)") + xlab("Time (hour)")
+p2
+```
+
+
+---
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+sims24 <- filter(sims, time==24)
+ggplot(data = sims24, aes(x = DV)) + 
+  geom_histogram(color = "white", alpha = 0.9) + 
+  xlab("Ctrough (ng/mL)") + 
+  scale_x_continuous(breaks = seq(0,150,10))
+```
+
+
+## NHANES
+
+- National 
+- Health 
+- And 
+- Nutrition 
+- Examination
+- Survey
+
+
+> "a program of studies designed to assess the health and nutritional status of adults and children in the United States"
+
+https://www.cdc.gov/nchs/nhanes/index.htm
+
+---
+
+- Survey 5000 people each year
+- Counties across the US
+  - 15 each year
+
+- Interview
+  - conducted in respondents' homes
+  - demographic, socioeconomic, dietary, and health-related questions
+- Examination
+  - performed in mobile centers which travel to locations around the country
+  - medical, dental, and physiological measurements,  laboratory tests
